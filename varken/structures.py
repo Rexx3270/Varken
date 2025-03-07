@@ -127,14 +127,16 @@ class OmbiTVRequest(NamedTuple):
     childRequests: list = None
     denied: bool = None
     deniedReason: None = None
+    externalProviderId: int = None
     id: int = None
     imdbId: str = None
+    languageProfile: int = None
     markedAsDenied: str = None
     overview: str = None
     posterPath: str = None
     qualityOverride: None = None
     releaseDate: str = None
-    rootFolder: None = None
+    rootFolder: int = None
     status: str = None
     title: str = None
     totalSeasons: int = None
@@ -145,40 +147,53 @@ class OmbiTVRequest(NamedTuple):
 
 class OmbiMovieRequest(NamedTuple):
     approved: bool = None
+    approved4K: bool = None
     available: bool = None
+    available4K: bool = None
     background: str = None
     canApprove: bool = None
     denied: bool = None
-    deniedReason: None = None
+    denied4K: bool = None
+    deniedReason: str = None
+    deniedReason4K: str = None
     digitalRelease: bool = None
-    digitalReleaseDate: None = None
+    digitalReleaseDate: str = None
+    has4KRequest: bool = None
     id: int = None
     imdbId: str = None
-    issueId: None = None
+    is4kRequest: bool = None
+    issueId: int = None
     issues: None = None
+    langCode: str = None
     markedAsApproved: str = None
-    markedAsAvailable: None = None
+    markedAsApproved4K: str = None
+    markedAsAvailable: str = None
+    markedAsAvailable4K: str = None
     markedAsDenied: str = None
+    markedAsDenied4K: str = None
     overview: str = None
+    playedByUsersCount: int = None
     posterPath: str = None
     qualityOverride: int = None
     released: bool = None
     releaseDate: str = None
+    requestCombination: int = None
+    requestedByAlias: str = None
     requestedDate: str = None
+    requestedDate4k: str = None
     requestedUser: dict = None
     requestedUserId: str = None
+    requestStatus: str = None
     requestType: int = None
     rootPathOverride: int = None
     showSubscribe: bool = None
+    source: int = None
     status: str = None
     subscribed: bool = None
     theMovieDbId: int = None
     title: str = None
-    langCode: str = None
-    languageCode: str = None
-    requestedByAlias: str = None
-    requestStatus: str = None
-
+    watchedByRequestedUser: bool = None
+    
 
 # Sonarr
 class SonarrTVShow(NamedTuple):
