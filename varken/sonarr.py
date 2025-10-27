@@ -131,10 +131,6 @@ class SonarrAPI(object):
                 
                 queue.append((series_title, episode_title, protocol, protocol_id, sxe, show.id, quality_name))
                 
-                except Exception as e:
-                    self.logger.error('Error processing Sonarr queue item: %s', e)
-                continue
-
         for series_title, episode_title, protocol, protocol_id, sxe, sonarr_id, quality in queue:
             hash_id = hashit(f'{self.server.id}{series_title}{sxe}')
             influx_payload.append(
