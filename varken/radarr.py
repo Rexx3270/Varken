@@ -13,13 +13,15 @@ class RadarrAPI(object):
         # Create session to reduce server web thread load, and globally define pageSize for all requests
         self.session = Session()
         self.session.headers = {'X-Api-Key': self.server.api_key}
+
         self.logger = getLogger()
 
     def __repr__(self):
         return f"<radarr-{self.server.id}>"
 
     def get_missing(self):
-        endpoint = '/api/movie'
+        """Collect missing monitored movies from Radarr"""
+        endpoint = '/api/v3/movie'
         now = datetime.now(timezone.utc).astimezone().isoformat()
         influx_payload = []
         missing = []
@@ -33,16 +35,16 @@ class RadarrAPI(object):
         try:
             movies = [RadarrMovie(**movie) for movie in get]
         except TypeError as e:
-            self.logger.error('TypeError has occurred : %s while creating RadarrMovie structure', e)
+            self.logger.error('TypeError while creating RadarrMovie structure: %s', e)
             return
 
         for movie in movies:
-            if movie.monitored and not movie.downloaded:
-                if movie.isAvailable:
-                    ma = 0
-                else:
-                    ma = 1
+            # Handle hasFile and isAvailable attributes for Radarr v5+
+            has_file = getattr(movie, 'hasFile', getattr(movie, 'downloaded', False))
+            is_available = getattr(movie, 'isAvailable', False)
 
+            if movie.monitored and not has_file:
+                ma = 0 if is_available else 1
                 movie_name = f'{movie.title} ({movie.year})'
                 missing.append((movie_name, ma, movie.tmdbId, movie.titleSlug))
 
@@ -66,10 +68,12 @@ class RadarrAPI(object):
                 }
             )
 
-        self.dbmanager.write_points(influx_payload)
+        if influx_payload:
+            self.dbmanager.write_points(influx_payload)
 
     def get_queue(self):
-        endpoint = '/api/queue'
+        """Collect queue information from Radarr"""
+        endpoint = '/api/v3/queue'
         now = datetime.now(timezone.utc).astimezone().isoformat()
         influx_payload = []
         queue = []
@@ -82,29 +86,39 @@ class RadarrAPI(object):
 
         for movie in get:
             try:
-                movie['movie'] = RadarrMovie(**movie['movie'])
+                if 'movie' in movie and isinstance(movie['movie'], dict):
+                    movie['movie'] = RadarrMovie(**movie['movie'])
             except TypeError as e:
-                self.logger.error('TypeError has occurred : %s while creating RadarrMovie structure', e)
+                self.logger.error('TypeError while creating RadarrMovie structure: %s', e)
                 return
 
         try:
             download_queue = [Queue(**movie) for movie in get]
         except TypeError as e:
-            self.logger.error('TypeError has occurred : %s while creating Queue structure', e)
+            self.logger.error('TypeError while creating Queue structure: %s', e)
             return
 
         for queue_item in download_queue:
             movie = queue_item.movie
-
             name = f'{movie.title} ({movie.year})'
 
-            if queue_item.protocol.upper() == 'USENET':
-                protocol_id = 1
-            else:
-                protocol_id = 0
+            protocol = getattr(queue_item, 'protocol', 'UNKNOWN').upper()
+            protocol_id = 1 if protocol == 'USENET' else 0
 
-            queue.append((name, queue_item.quality['quality']['name'], queue_item.protocol.upper(),
-                          protocol_id, queue_item.id, movie.titleSlug))
+            # Handle quality field changes in Radarr v5
+            quality_data = getattr(queue_item, 'quality', {})
+            if isinstance(quality_data, dict):
+                quality_name = (
+                    quality_data.get('quality', {}).get('name')
+                    or quality_data.get('name')
+                    or 'Unknown'
+                )
+            else:
+                quality_name = str(quality_data)
+
+            queue.append(
+                (name, quality_name, protocol, protocol_id, queue_item.id, movie.titleSlug)
+            )
 
         for name, quality, protocol, protocol_id, qid, title_slug in queue:
             hash_id = hashit(f'{self.server.id}{name}{quality}')
@@ -128,4 +142,5 @@ class RadarrAPI(object):
                 }
             )
 
-        self.dbmanager.write_points(influx_payload)
+        if influx_payload:
+            self.dbmanager.write_points(influx_payload)
