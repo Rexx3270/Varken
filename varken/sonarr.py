@@ -47,18 +47,18 @@ class SonarrAPI(object):
         for show in tv_shows:
             sxe = f'S{show.seasonNumber:0>2}E{show.episodeNumber:0>2}'
             downloaded = 1 if getattr(show, 'hasFile', False) else 0
-            
+
             series_title = show.series.get('title', 'Unknown Series')
             episode_title = getattr(show, 'title', 'Unknown Episode')
             air_date_utc = getattr(show, 'airDateUtc', None)
             show_id = getattr(show, 'id', 0)
-            
+
             if query == "Missing":
                 if getattr(show, 'monitored', False) and not downloaded:
                     missing.append((series_title, downloaded, sxe, episode_title, air_date_utc, show_id))
             else:
                 air_days.append((series_title, downloaded, sxe, episode_title, air_date_utc, show_id))
-                
+
         for series_title, dl_status, sxe, episode_title, air_date_utc, sonarr_id in (air_days or missing):
             hash_id = hashit(f'{self.server.id}{series_title}{sxe}')
             influx_payload.append(
@@ -105,7 +105,7 @@ class SonarrAPI(object):
                 download_queue.append(Queue(**show))
             except TypeError as e:
                 self.logger.error('TypeError while creating Queue structure: %s - data: %s', e, show)
-                
+
         if not download_queue:
             return
 
@@ -115,7 +115,7 @@ class SonarrAPI(object):
                 sxe = f"S{episode.get('seasonNumber', 0):0>2}E{episode.get('episodeNumber', 0):0>2}"
                 protocol = getattr(show, 'protocol', 'UNKNOWN').upper()
                 protocol_id = 1 if protocol == 'USENET' else 0
-                
+
                 quality_data = getattr(show, 'quality', {})
                 if isinstance(quality_data, dict):
                     quality_name = (
@@ -125,12 +125,16 @@ class SonarrAPI(object):
                     )
                 else:
                     quality_name = str(quality_data)
-                
+
                 series_title = show.series.get('title', 'Unknown Series')
                 episode_title = episode.get('title', 'Unknown Episode')
-                
+
                 queue.append((series_title, episode_title, protocol, protocol_id, sxe, show.id, quality_name))
-                
+
+            except Exception as e:
+                self.logger.error('Error processing Sonarr queue item: %s', e)
+                continue
+
         for series_title, episode_title, protocol, protocol_id, sxe, sonarr_id, quality in queue:
             hash_id = hashit(f'{self.server.id}{series_title}{sxe}')
             influx_payload.append(
@@ -153,7 +157,7 @@ class SonarrAPI(object):
                     }
                 }
             )
-            
+
         if influx_payload:
             self.dbmanager.write_points(influx_payload)
         else:
